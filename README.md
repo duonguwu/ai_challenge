@@ -6,7 +6,7 @@ Hệ thống **Keyframe-based Image Search (KIS)** cho phép tìm kiếm video t
 
 ### 🎯 Mục tiêu Phase hiện tại
 Xây dựng pipeline để đưa dữ liệu đã được tiền xử lý lên **Qdrant Vector Database**, bao gồm:
-- CLIP features (512-dim vectors) 
+- CLIP features (512-dim vectors)
 - Metadata keyframes (timestamp, frame index)
 - Object detection results
 - Structured payload cho việc tìm kiếm
@@ -138,7 +138,7 @@ def scan_dataset():
 def process_video(video_id):
     """
     1. Load CLIP features: np.load(f"{video_id}.npy")
-    2. Load metadata: pd.read_csv(f"{video_id}.csv") 
+    2. Load metadata: pd.read_csv(f"{video_id}.csv")
     3. Load objects: glob(f"objects/{video_id}/*.json")
     4. Combine và tạo Qdrant points
     """
@@ -170,7 +170,7 @@ def upload_to_qdrant():
 
 #### 🎯 Indexing strategy
 - **Primary index**: CLIP vector similarity (Cosine)
-- **Payload filters**: 
+- **Payload filters**:
   - `video_id` (keyword)
   - `object_labels` (keyword array)
   - `pts_time` (range filter)
@@ -190,7 +190,7 @@ def upload_to_qdrant():
   "results": [
     {
       "score": 0.95,
-      "video_id": "L21_V001", 
+      "video_id": "L21_V001",
       "keyframe": "001.jpg",
       "timestamp": "00:00:00",
       "objects": ["Lantern", "Skyscraper"],
@@ -205,12 +205,12 @@ def upload_to_qdrant():
 ## ⚡ Tối ưu hóa hiệu suất
 
 ### 🗄️ Database Optimization
-- **Vector compression**: Sử dụng `float16` thay vì `float32` 
+- **Vector compression**: Sử dụng `float16` thay vì `float32`
 - **Disk optimization**: SSD storage cho Qdrant
 - **Memory management**: Configure memory mapping cho large dataset
 - **Sharding**: Chia collection theo batch nếu cần
 
-### 🔍 Search Optimization  
+### 🔍 Search Optimization
 - **Pre-filtering**: Filter payload trước khi vector search
 - **Caching**: Cache frequent queries
 - **Batch queries**: Xử lý nhiều queries cùng lúc
@@ -225,7 +225,7 @@ def upload_to_qdrant():
 
 ### ⏱️ Timeline
 1. **Week 1**: Setup Qdrant + Data validation
-2. **Week 2**: Implement preprocessing pipeline  
+2. **Week 2**: Implement preprocessing pipeline
 3. **Week 3**: Batch upload + indexing
 4. **Week 4**: Search API + testing
 

@@ -1,5 +1,16 @@
 # 🎬 Video Retrieval System - KIS Challenge
 
+## Cách chạy
+cd vào thư mục BE
+```
+uvicorn app.main:app --reload --port 8000
+``````
+Vào thư mục có chứa folder data
+
+```
+python3 -m http.server 3000
+```
+Sau đó vào link http://0.0.0.0:3000/ai_challenge/FE/
 ## 📋 Tổng quan bài toán
 
 Hệ thống **Keyframe-based Image Search (KIS)** cho phép tìm kiếm video thông qua mô tả văn bản. Khi người dùng nhớ mơ hồ một cảnh nào đó trong video, họ có thể mô tả bằng văn bản để tìm lại video chứa cảnh đó.

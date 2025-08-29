@@ -12,6 +12,11 @@ let currentObjects = [];
 let searchMode = 'text'; // 'text' or 'image'
 let uploadedImageBase64 = null;
 
+// Carousel state
+let currentFrames = [];
+let currentFrameIndex = 0;
+let centerFrameIndex = 0;
+
 // DOM elements
 const queryInput = document.getElementById('queryInput');
 const objectInput = document.getElementById('objectInput');
@@ -30,6 +35,19 @@ const loadingSpinner = document.getElementById('loadingSpinner');
 const errorMessage = document.getElementById('errorMessage');
 const errorText = document.getElementById('errorText');
 const queryStats = document.getElementById('queryStats');
+
+// Carousel elements
+const carouselModal = document.getElementById('carouselModal');
+const closeCarousel = document.getElementById('closeCarousel');
+const prevFrame = document.getElementById('prevFrame');
+const nextFrame = document.getElementById('nextFrame');
+const currentFrameImg = document.getElementById('currentFrameImg');
+const framePosition = document.getElementById('framePosition');
+const frameTime = document.getElementById('frameTime');
+const frameId = document.getElementById('frameId');
+const frameIdx = document.getElementById('frameIdx');
+const thumbnailContainer = document.getElementById('thumbnailContainer');
+const carouselTitle = document.getElementById('carouselTitle');
 
 // Event listeners
 searchBtn.addEventListener('click', (e) => {
@@ -64,6 +82,78 @@ imageModeBtn.addEventListener('click', (e) => {
 });
 imageInput.addEventListener('change', handleImageUpload);
 
+// Carousel event listeners
+closeCarousel.addEventListener('click', closeCarouselModal);
+prevFrame.addEventListener('click', showPreviousFrame);
+nextFrame.addEventListener('click', showNextFrame);
+carouselModal.addEventListener('click', (e) => {
+    if (e.target === carouselModal) {
+        closeCarouselModal();
+    }
+});
+
+// Keyboard navigation for carousel
+document.addEventListener('keydown', (e) => {
+    if (carouselModal.style.display === 'flex') {
+        if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            showPreviousFrame();
+        } else if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            showNextFrame();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            closeCarouselModal();
+        }
+    }
+});
+
+// Clipboard paste functionality
+document.addEventListener('paste', async (e) => {
+    // Only handle paste when in image search mode and not in carousel
+    if (searchMode !== 'image' || carouselModal.style.display === 'flex') {
+        return;
+    }
+
+    e.preventDefault();
+
+    // Visual feedback
+    imagePreview.classList.add('paste-active');
+    setTimeout(() => {
+        imagePreview.classList.remove('paste-active');
+    }, 300);
+
+    const items = e.clipboardData.items;
+    let imageItem = null;
+
+    // Find image in clipboard
+    for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+            imageItem = items[i];
+            break;
+        }
+    }
+
+    if (imageItem) {
+        console.log('📋 Image pasted from clipboard');
+        const file = imageItem.getAsFile();
+        await handleImageFile(file, 'clipboard');
+    } else {
+        console.log('📋 No image found in clipboard');
+        // Show temporary message
+        const originalContent = imagePreview.innerHTML;
+        imagePreview.innerHTML = `
+            <div class="upload-placeholder" style="color: #e74c3c;">
+                ❌ Không tìm thấy ảnh trong clipboard<br>
+                <small>Hãy copy ảnh trước khi dán</small>
+            </div>
+        `;
+        setTimeout(() => {
+            imagePreview.innerHTML = originalContent;
+        }, 2000);
+    }
+});
+
 // Set search mode
 function setSearchMode(mode) {
     searchMode = mode;
@@ -77,9 +167,8 @@ function setSearchMode(mode) {
     document.getElementById('imageInputSection').style.display = mode === 'image' ? 'block' : 'none';
 }
 
-// Handle image upload
-function handleImageUpload(event) {
-    const file = event.target.files[0];
+// Handle image file (from upload or clipboard)
+async function handleImageFile(file, source = 'upload') {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
@@ -87,12 +176,37 @@ function handleImageUpload(event) {
         return;
     }
 
+    console.log(`🖼️ Processing image from ${source}:`, file.name || 'clipboard', file.type);
+
     const reader = new FileReader();
     reader.onload = function(e) {
         uploadedImageBase64 = e.target.result.split(',')[1]; // Remove data:image/...;base64, prefix
-        imagePreview.innerHTML = `<img src="${e.target.result}" alt="Uploaded image" style="max-width: 100%; max-height: 200px;">`;
+
+        const sourceLabel = source === 'clipboard' ? 'Ảnh từ clipboard' : 'Ảnh đã upload';
+        imagePreview.innerHTML = `
+            <img src="${e.target.result}"
+                 alt="${sourceLabel}"
+                 style="max-width: 100%; max-height: 200px; border-radius: 4px;" />
+            <div style="margin-top: 8px; font-size: 12px; color: #666; text-align: center;">
+                📋 ${sourceLabel} • ${file.type}
+            </div>
+        `;
+
+        console.log('✅ Image processed successfully');
     };
+
+    reader.onerror = function() {
+        showError('Lỗi đọc file ảnh');
+        console.error('❌ Error reading image file');
+    };
+
     reader.readAsDataURL(file);
+}
+
+// Handle image upload
+function handleImageUpload(event) {
+    const file = event.target.files[0];
+    handleImageFile(file, 'upload');
 }
 
 // Handle search button click
@@ -396,7 +510,7 @@ function createGridItem(result) {
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    gridItem.innerHTML = `
+        gridItem.innerHTML = `
         <div class="grid-item-image" style="background-image: url('${imageUrl}')"
              onerror="this.classList.add('error'); this.innerHTML='Không thể tải ảnh';">
             <div class="rank-badge">#${result.rank}</div>
@@ -408,6 +522,11 @@ function createGridItem(result) {
             <div class="grid-item-frame">Frame: ${result.keyframe_idx}</div>
         </div>
     `;
+
+    // Add click handler to open carousel
+    gridItem.addEventListener('click', () => {
+        openCarouselModal(result);
+    });
 
     return gridItem;
 }
@@ -535,6 +654,189 @@ function init() {
     updateButtonStates();
 
     console.log('✅ App initialized successfully');
+}
+
+// Carousel Functions
+function openCarouselModal(selectedResult) {
+    console.log('🎬 Opening carousel for:', selectedResult);
+
+    try {
+        // Parse current frame info from jpg_path
+        // Example: "Keyframes_L26/keyframes/L26_V498/016.jpg"
+        const pathParts = selectedResult.jpg_path.split('/');
+        const fileName = pathParts[pathParts.length - 1]; // "016.jpg"
+        const currentFrameNum = parseInt(fileName.replace('.jpg', '')); // 16
+        const folderPath = pathParts.slice(0, -1).join('/'); // "Keyframes_L26/keyframes/L26_V498"
+
+        // Generate nearby frames (±25 = 50 total)
+        const rangeSize = 25;
+        const startFrame = Math.max(1, currentFrameNum - rangeSize);
+        const endFrame = currentFrameNum + rangeSize;
+
+        console.log(`📊 Generating frames ${startFrame} to ${endFrame} (center: ${currentFrameNum})`);
+
+        currentFrames = [];
+        for (let i = startFrame; i <= endFrame; i++) {
+            const frameFileName = i.toString().padStart(3, '0') + '.jpg';
+            const framePath = `${folderPath}/${frameFileName}`;
+
+            // Calculate estimated pts_time (rough calculation)
+            const estimatedTime = selectedResult.pts_time + ((i - currentFrameNum) * (1 / (selectedResult.fps || 25)));
+            const estimatedFrameIdx = selectedResult.frame_idx + ((i - currentFrameNum) * 1);
+
+            currentFrames.push({
+                original_id: `${selectedResult.video_id}_${i.toString().padStart(3, '0')}`,
+                video_id: selectedResult.video_id,
+                keyframe_idx: i,
+                keyframe_name: frameFileName,
+                jpg_path: framePath,
+                pts_time: Math.max(0, estimatedTime),
+                frame_idx: Math.max(0, estimatedFrameIdx),
+                fps: selectedResult.fps || 25,
+                objects: i === currentFrameNum ? selectedResult.objects : [],
+                is_center: i === currentFrameNum
+            });
+        }
+
+        centerFrameIndex = currentFrames.findIndex(f => f.is_center);
+        currentFrameIndex = centerFrameIndex;
+
+        // Update modal title
+        carouselTitle.textContent = `Khung hình lân cận - ${selectedResult.video_id} (${startFrame}-${endFrame})`;
+
+        // Render carousel
+        renderCarousel();
+
+        // Show modal
+        carouselModal.style.display = 'flex';
+
+        console.log('✅ Carousel opened successfully with', currentFrames.length, 'frames');
+
+    } catch (error) {
+        console.error('❌ Error opening carousel:', error);
+        showError(`Lỗi tải khung hình: ${error.message}`);
+    }
+}
+
+function closeCarouselModal() {
+    console.log('🚪 Closing carousel');
+    carouselModal.style.display = 'none';
+    currentFrames = [];
+    currentFrameIndex = 0;
+    centerFrameIndex = 0;
+}
+
+function showPreviousFrame() {
+    if (currentFrameIndex > 0) {
+        currentFrameIndex--;
+        updateCurrentFrame();
+    }
+}
+
+function showNextFrame() {
+    if (currentFrameIndex < currentFrames.length - 1) {
+        currentFrameIndex++;
+        updateCurrentFrame();
+    }
+}
+
+function renderCarousel() {
+    console.log('🎨 Rendering carousel with', currentFrames.length, 'frames');
+
+    // Render thumbnails
+    thumbnailContainer.innerHTML = '';
+    currentFrames.forEach((frame, index) => {
+        const thumbnail = createThumbnailItem(frame, index);
+        thumbnailContainer.appendChild(thumbnail);
+    });
+
+    // Update current frame
+    updateCurrentFrame();
+}
+
+function createThumbnailItem(frame, index) {
+    const thumbnail = document.createElement('div');
+    thumbnail.className = 'thumbnail-item';
+
+    if (index === currentFrameIndex) {
+        thumbnail.classList.add('active');
+    }
+
+    if (frame.is_center) {
+        thumbnail.classList.add('center');
+    }
+
+    const imageUrl = `/data/${frame.jpg_path}`;
+
+    thumbnail.innerHTML = `
+        <img src="${imageUrl}"
+             alt="Frame ${frame.keyframe_idx}"
+             onerror="this.style.opacity='0.3'; this.alt='❌';"
+        />
+    `;
+
+    thumbnail.addEventListener('click', () => {
+        currentFrameIndex = index;
+        updateCurrentFrame();
+    });
+
+    return thumbnail;
+}
+
+function updateCurrentFrame() {
+    if (currentFrames.length === 0) return;
+
+    const frame = currentFrames[currentFrameIndex];
+    console.log('🖼️ Updating to frame:', frame.keyframe_idx);
+
+    // Update main image
+    const imageUrl = `/data/${frame.jpg_path}`;
+    currentFrameImg.src = imageUrl;
+    currentFrameImg.onerror = function() {
+        this.style.opacity = '0.5';
+        this.alt = 'Ảnh không tồn tại';
+    };
+    currentFrameImg.onload = function() {
+        this.style.opacity = '1';
+    };
+
+    // Update frame info
+    framePosition.textContent = `${currentFrameIndex + 1} / ${currentFrames.length}`;
+    frameTime.textContent = formatTime(frame.pts_time);
+    frameId.textContent = `${frame.video_id}_${frame.keyframe_idx}`;
+    frameIdx.textContent = `Frame: ${frame.frame_idx}`;
+
+    // Update navigation buttons
+    prevFrame.disabled = currentFrameIndex === 0;
+    nextFrame.disabled = currentFrameIndex === currentFrames.length - 1;
+
+    // Update thumbnail selection
+    document.querySelectorAll('.thumbnail-item').forEach((thumb, index) => {
+        thumb.classList.toggle('active', index === currentFrameIndex);
+    });
+
+    // Scroll thumbnail into view
+    const activeThumbnail = document.querySelector('.thumbnail-item.active');
+    if (activeThumbnail) {
+        activeThumbnail.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest',
+            inline: 'center'
+        });
+    }
+}
+
+// Format time helper (already exists but ensuring it's available)
+function formatTime(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+
+    if (hours > 0) {
+        return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    } else {
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
 }
 
 // Start the app when DOM is loaded

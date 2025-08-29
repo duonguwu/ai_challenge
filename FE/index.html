@@ -39,8 +39,14 @@
                         <div class="input-group">
                             <label for="imageInput">Chọn ảnh để tìm kiếm:</label>
                             <input type="file" id="imageInput" accept="image/*" class="file-input">
+                            <div class="upload-hint">
+                                💡 <strong>Mẹo:</strong> Bạn có thể dán ảnh trực tiếp bằng <kbd>Ctrl+V</kbd>
+                            </div>
                             <div id="imagePreview" class="image-preview">
-                                <div class="upload-placeholder">Chưa có ảnh được chọn</div>
+                                <div class="upload-placeholder">
+                                    🖼️ Chưa có ảnh được chọn<br>
+                                    <small>Chọn file hoặc dán ảnh (Ctrl+V)</small>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -103,6 +109,45 @@
         <!-- Error Message -->
         <div id="errorMessage" class="error-message" style="display: none;">
             <p id="errorText"></p>
+        </div>
+
+        <!-- Frame Carousel Modal -->
+        <div id="carouselModal" class="carousel-modal" style="display: none;">
+            <div class="carousel-content">
+                <div class="carousel-header">
+                    <h3 id="carouselTitle">Khung hình lân cận</h3>
+                    <button type="button" id="closeCarousel" class="close-btn">&times;</button>
+                </div>
+
+                <div class="carousel-body">
+                    <div class="carousel-container">
+                        <button type="button" id="prevFrame" class="nav-btn nav-prev">&lt;</button>
+
+                        <div class="frame-display">
+                            <img id="currentFrameImg" src="" alt="Current frame" />
+                            <div class="frame-info">
+                                <div class="frame-details">
+                                    <span id="framePosition">1 / 50</span>
+                                    <span id="frameTime">00:18:21</span>
+                                </div>
+                                <div class="frame-metadata">
+                                    <span id="frameId">L28_V015_427</span>
+                                    <span id="frameIdx">Frame: 27533</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="button" id="nextFrame" class="nav-btn nav-next">&gt;</button>
+                    </div>
+
+                    <!-- Thumbnail strip -->
+                    <div class="thumbnail-strip">
+                        <div id="thumbnailContainer" class="thumbnail-container">
+                            <!-- Thumbnails will be added dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 

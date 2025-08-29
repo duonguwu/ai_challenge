@@ -1,9 +1,10 @@
 """
 Pydantic schemas for API requests and responses
 """
-from pydantic import BaseModel, Field
-from typing import List, Dict, Any, Optional
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field
 
 
 class HealthResponse(BaseModel):
@@ -77,19 +78,60 @@ class ErrorResponse(BaseModel):
 
 
 # Video Search API Schemas
-class VideoSearchRequest(BaseModel):
-    """Request model for video search"""
-    query_text: List[str] = Field(..., description="List of text queries for video search")
+class VideoTextSearchRequest(BaseModel):
+    """Request model for text-based video search"""
+    query_texts: List[str] = Field(
+        ..., description="List of text queries"
+    )
+    object_filters: Optional[List[str]] = Field(
+        default=None, description="Filter by object types"
+    )
+    limit: int = Field(default=500, ge=1, le=1000)
+    score_threshold: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
+class VideoImageSearchRequest(BaseModel):
+    """Request model for image-based video search"""
+    image_base64: str = Field(..., description="Base64 encoded image")
+    object_filters: Optional[List[str]] = Field(
+        default=None, description="Filter by object types"
+    )
+    limit: int = Field(default=500, ge=1, le=1000)
+    score_threshold: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
 class VideoSearchResult(BaseModel):
     """Individual video search result"""
-    original_id: str = Field(..., description="Original video ID")
-    jpg_path: str = Field(..., description="Path to the JPEG image file")
-    frame_idx: int = Field(..., description="Frame index in the video")
-    similarity_score: float = Field(..., description="Similarity score (0.0-1.0)")
+    rank: int = Field(..., description="Ranking position")
+    original_id: str = Field(..., description="Original frame ID")
+    video_id: str = Field(..., description="Video ID")
+    keyframe_idx: int = Field(..., description="Keyframe index")
+    jpg_path: str = Field(..., description="Path to JPEG file")
+    pts_time: float = Field(..., description="Timestamp in video")
+    frame_idx: int = Field(..., description="Frame index")
+    similarity_score: float = Field(..., description="Similarity score")
+    objects: List[Dict[str, Any]] = Field(
+        default=[], description="Detected objects"
+    )
+
+
+class VideoGroupedResult(BaseModel):
+    """Video search results grouped by video"""
+    video_id: str = Field(..., description="Video ID")
+    total_frames: int = Field(..., description="Number of matching frames")
+    best_score: float = Field(..., description="Highest similarity score")
+    frames: List[VideoSearchResult] = Field(
+        ..., description="List of matching frames"
+    )
 
 
 class VideoSearchResponse(BaseModel):
     """Response model for video search"""
-    results: List[VideoSearchResult] = Field(..., description="List of search results")
+    total_results: int = Field(..., description="Total number of results")
+    query_time_ms: float = Field(..., description="Query execution time")
+    results: List[VideoSearchResult] = Field(
+        ..., description="List of search results"
+    )
+    grouped_by_video: List[VideoGroupedResult] = Field(
+        ..., description="Results grouped by video"
+    )

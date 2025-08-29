@@ -1,175 +1,189 @@
 """
-Qdrant client for vector database operations
+Qdrant client for video keyframes search
 """
-from qdrant_client import QdrantClient
-from qdrant_client.models import (
-    Distance,
-    VectorParams,
-    PointStruct,
-    Filter,
-    FieldCondition,
-    MatchValue,
-    SearchRequest,
-    CreateCollection,
-    CollectionInfo
-)
-from typing import List, Dict, Any, Optional, Tuple
-import numpy as np
+import os
+from typing import Any, Dict, List, Optional
+
 from loguru import logger
+from qdrant_client import QdrantClient
+from qdrant_client.models import FieldCondition, Filter, MatchAny
 
-from app.config import settings
+# Configuration
+QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
+QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
+COLLECTION_NAME = os.getenv("COLLECTION_NAME", "video_keyframes")
 
 
-class QdrantManager:
-    """Manager class for Qdrant operations"""
-    
+class VideoQdrantClient:
+    """Qdrant client for video keyframes search"""
+
     def __init__(self):
-        self.client = QdrantClient(
-            host=settings.qdrant_host,
-            port=settings.qdrant_port
-        )
-        self.collection_name = settings.qdrant_collection_name
-        self.vector_size = settings.qdrant_vector_size
-        
-    async def init_collection(self) -> bool:
-        """Initialize collection if it doesn't exist"""
-        try:
-            # Check if collection exists
-            collections = self.client.get_collections()
-            collection_names = [col.name for col in collections.collections]
-            
-            if self.collection_name not in collection_names:
-                logger.info(f"Creating collection: {self.collection_name}")
-                
-                # Create collection with proper configuration
-                self.client.create_collection(
-                    collection_name=self.collection_name,
-                    vectors_config=VectorParams(
-                        size=self.vector_size,
-                        distance=Distance.COSINE
-                    )
-                )
-                logger.info(f"Collection {self.collection_name} created successfully")
-            else:
-                logger.info(f"Collection {self.collection_name} already exists")
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error initializing collection: {e}")
-            return False
-    
-    async def add_vectors(
-        self, 
-        vectors: List[np.ndarray], 
-        ids: List[str],
-        payloads: Optional[List[Dict[str, Any]]] = None
-    ) -> bool:
-        """Add vectors to collection"""
-        try:
-            if payloads is None:
-                payloads = [{} for _ in vectors]
-            
-            points = []
-            for i, (vector, point_id, payload) in enumerate(zip(vectors, ids, payloads)):
-                points.append(
-                    PointStruct(
-                        id=point_id,
-                        vector=vector.tolist(),
-                        payload=payload
-                    )
-                )
-            
-            self.client.upsert(
-                collection_name=self.collection_name,
-                points=points
-            )
-            
-            logger.info(f"Added {len(points)} vectors to collection")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error adding vectors: {e}")
-            return False
-    
-    async def search_vectors(
+        self.client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
+        self.collection_name = COLLECTION_NAME
+        logger.info(f"Connected to Qdrant at {QDRANT_HOST}:{QDRANT_PORT}")
+
+    def search_by_vector(
         self,
-        query_vector: np.ndarray,
-        limit: int = 10,
-        score_threshold: float = 0.7,
-        filter_conditions: Optional[Dict[str, Any]] = None
-    ) -> List[Tuple[str, float, Dict[str, Any]]]:
-        """Search for similar vectors"""
+        query_vector: List[float],
+        limit: int = 500,
+        object_filters: Optional[List[str]] = None,
+        score_threshold: float = 0.0
+    ) -> List[Dict[str, Any]]:
+        """
+        Search keyframes by vector similarity
+
+        Args:
+            query_vector: CLIP embedding vector (512-dim)
+            limit: Maximum number of results
+            object_filters: List of objects to filter by
+            score_threshold: Minimum similarity score
+
+        Returns:
+            List of search results with payload and scores
+        """
         try:
-            # Build filter if conditions provided
+            # Build filter conditions
+            filter_conditions = []
+
+            # Filter by objects if specified
+            if object_filters:
+                filter_conditions.append(
+                    FieldCondition(
+                        key="object_labels",
+                        match=MatchAny(any=object_filters)
+                    )
+                )
+
+            # Create filter object
             search_filter = None
             if filter_conditions:
-                conditions = []
-                for field, value in filter_conditions.items():
-                    conditions.append(
-                        FieldCondition(
-                            key=field,
-                            match=MatchValue(value=value)
-                        )
-                    )
-                search_filter = Filter(must=conditions)
-            
-            # Perform search
-            search_result = self.client.search(
+                search_filter = Filter(must=filter_conditions)
+
+            # Perform vector search
+            search_results = self.client.search(
                 collection_name=self.collection_name,
-                query_vector=query_vector.tolist(),
+                query_vector=query_vector,
+                query_filter=search_filter,
                 limit=limit,
                 score_threshold=score_threshold,
-                query_filter=search_filter
+                with_payload=True
             )
-            
+
             # Format results
             results = []
-            for point in search_result:
-                results.append((
-                    point.id,
-                    point.score,
-                    point.payload
-                ))
-            
+            for idx, result in enumerate(search_results):
+                results.append({
+                    "rank": idx + 1,
+                    "score": float(result.score),
+                    "payload": result.payload
+                })
+            logger.info(f"Vector search results: {results[:5]}")
+            logger.info(f"Vector search returned {len(results)} results")
             return results
-            
+
         except Exception as e:
-            logger.error(f"Error searching vectors: {e}")
-            return []
-    
-    async def delete_vectors(self, ids: List[str]) -> bool:
-        """Delete vectors by IDs"""
+            logger.error(f"Vector search failed: {e}")
+            raise
+
+    def search_multiple_vectors(
+        self,
+        query_vectors: List[List[float]],
+        limit: int = 500,
+        object_filters: Optional[List[str]] = None,
+        score_threshold: float = 0.0
+    ) -> List[Dict[str, Any]]:
+        """
+        Search with multiple vectors and merge results
+
+        Args:
+            query_vectors: List of CLIP embedding vectors
+            limit: Limit per query (total may be less due to deduplication)
+            object_filters: List of objects to filter by
+            score_threshold: Minimum similarity score
+
+        Returns:
+            Merged and deduplicated results
+        """
         try:
-            self.client.delete(
-                collection_name=self.collection_name,
-                points_selector=ids
-            )
-            logger.info(f"Deleted {len(ids)} vectors from collection")
-            return True
-            
+            all_results = {}  # Use dict to deduplicate by original_id
+
+            for i, query_vector in enumerate(query_vectors):
+                logger.info(f"Processing query vector {i+1}/{len(query_vectors)}")
+
+                results = self.search_by_vector(
+                    query_vector=query_vector,
+                    limit=limit,
+                    object_filters=object_filters,
+                    score_threshold=score_threshold
+                )
+
+                # Merge results, keeping highest score for duplicates
+                for result in results:
+                    original_id = result["payload"]["original_id"]
+
+                    if (original_id not in all_results or
+                            result["score"] > all_results[original_id]["score"]):
+                        all_results[original_id] = result
+
+            # Convert back to list and sort by score
+            merged_results = list(all_results.values())
+            merged_results.sort(key=lambda x: x["score"], reverse=True)
+
+            # Re-rank after merging
+            for idx, result in enumerate(merged_results):
+                result["rank"] = idx + 1
+
+            logger.info(f"Merged search returned {len(merged_results)} unique results")
+            return merged_results
+
         except Exception as e:
-            logger.error(f"Error deleting vectors: {e}")
-            return False
-    
-    async def get_collection_info(self) -> Optional[CollectionInfo]:
+            logger.error(f"Multiple vector search failed: {e}")
+            raise
+
+    def group_results_by_video(
+        self,
+        results: List[Dict[str, Any]]
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Group search results by video_id
+
+        Args:
+            results: List of search results
+
+        Returns:
+            Dictionary grouped by video_id
+        """
+        grouped = {}
+
+        for result in results:
+            video_id = result["payload"]["video_id"]
+
+            if video_id not in grouped:
+                grouped[video_id] = []
+
+            grouped[video_id].append(result)
+
+        # Sort each group by score
+        for video_id in grouped:
+            grouped[video_id].sort(key=lambda x: x["score"], reverse=True)
+
+        logger.info(f"Results grouped into {len(grouped)} videos")
+        return grouped
+
+    def get_collection_info(self) -> Dict[str, Any]:
         """Get collection information"""
         try:
-            return self.client.get_collection(self.collection_name)
+            info = self.client.get_collection(self.collection_name)
+            return {
+                "collection_name": self.collection_name,
+                "points_count": info.points_count,
+                "vectors_count": info.vectors_count,
+                "status": info.status
+            }
         except Exception as e:
-            logger.error(f"Error getting collection info: {e}")
-            return None
-    
-    async def health_check(self) -> bool:
-        """Check if Qdrant is healthy"""
-        try:
-            # Try to get collections to check connection
-            self.client.get_collections()
-            return True
-        except Exception as e:
-            logger.error(f"Qdrant health check failed: {e}")
-            return False
+            logger.error(f"Failed to get collection info: {e}")
+            raise
 
 
-# Global Qdrant manager instance
-qdrant_manager = QdrantManager()
+# Global client instance
+qdrant_client = VideoQdrantClient()

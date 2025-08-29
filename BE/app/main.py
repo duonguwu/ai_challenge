@@ -1,16 +1,15 @@
 """
 FastAPI application entry point
 """
+from contextlib import asynccontextmanager
+
+from app.api.api import api_router
+from app.config import settings
+from app.core.logging import setup_logging
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from contextlib import asynccontextmanager
 from loguru import logger
-
-from app.config import settings
-from app.core.logging import setup_logging
-from app.api.api import api_router
-from app.database.qdrant_client import qdrant_manager
 
 
 @asynccontextmanager
@@ -18,21 +17,21 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     # Startup
     logger.info("Starting FastAPI application...")
-    
+
     # Setup logging
     setup_logging()
-    
-    # Initialize Qdrant collection
-    logger.info("Initializing Qdrant collection...")
-    success = await qdrant_manager.init_collection()
-    if not success:
-        logger.error("Failed to initialize Qdrant collection")
-        raise RuntimeError("Qdrant initialization failed")
-    
-    logger.info("FastAPI application started successfully")
-    
+
+    # # Initialize Qdrant collection
+    # logger.info("Initializing Qdrant collection...")
+    # success = await qdrant_client.init_collection()
+    # if not success:
+    #     logger.error("Failed to initialize Qdrant collection")
+    #     raise RuntimeError("Qdrant initialization failed")
+
+    # logger.info("FastAPI application started successfully")
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down FastAPI application...")
 
@@ -98,7 +97,7 @@ async def general_exception_handler(request, exc):
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     uvicorn.run(
         "app.main:app",
         host=settings.host,

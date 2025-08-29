@@ -16,27 +16,49 @@
             <!-- Left Sidebar - Input Section -->
             <div class="sidebar">
                 <div class="search-section">
+                    <!-- Search Mode Selection -->
+                    <div class="mode-selector">
+                        <button type="button" id="textModeBtn" class="btn btn-mode active">🔤 Tìm bằng văn bản</button>
+                        <button type="button" id="imageModeBtn" class="btn btn-mode">🖼️ Tìm bằng ảnh</button>
+                    </div>
+
+                    <!-- Text Search Section -->
+                    <div id="textInputSection" class="input-section">
+                        <div class="input-group">
+                            <label for="queryInput">Nhập câu query (mỗi dòng một câu):</label>
+                            <textarea
+                                id="queryInput"
+                                placeholder="Ví dụ:&#10;a person walking&#10;a person with red hat is walking&#10;car driving"
+                                rows="4"
+                            ></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Image Search Section -->
+                    <div id="imageInputSection" class="input-section" style="display: none;">
+                        <div class="input-group">
+                            <label for="imageInput">Chọn ảnh để tìm kiếm:</label>
+                            <input type="file" id="imageInput" accept="image/*" class="file-input">
+                            <div id="imagePreview" class="image-preview">
+                                <div class="upload-placeholder">Chưa có ảnh được chọn</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Object Filter Section -->
                     <div class="input-group">
-                        <label for="queryInput">Nhập câu query (mỗi dòng một câu):</label>
-                        <textarea 
-                            id="queryInput" 
-                            placeholder="Ví dụ:&#10;a person walking&#10;a person with red hat is walking&#10;car driving"
-                            rows="4"
+                        <label for="objectInput">Lọc theo object (tùy chọn, mỗi dòng một object):</label>
+                        <textarea
+                            id="objectInput"
+                            placeholder="Ví dụ:&#10;Human face&#10;Person&#10;Car"
+                            rows="3"
                         ></textarea>
                     </div>
-                    
-                    <div class="input-group">
-                        <label for="objectInput">Nhập list object (mỗi dòng một object):</label>
-                        <textarea 
-                            id="objectInput" 
-                            placeholder="Ví dụ:&#10;PERSON&#10;DOG&#10;CAR"
-                            rows="4"
-                        ></textarea>
-                    </div>
-                    
+
+                    <!-- Search Buttons -->
                     <div class="button-group">
-                        <button id="searchBtn" class="btn btn-primary">Tìm kiếm</button>
-                        <button id="searchMoreBtn" class="btn btn-secondary" disabled>Tìm tiếp</button>
+                        <button type="button" id="searchBtn" class="btn btn-primary">🔍 Tìm kiếm</button>
+                        <button type="button" id="searchMoreBtn" class="btn btn-secondary" disabled>➕ Tìm tiếp</button>
                     </div>
                 </div>
             </div>
@@ -51,12 +73,15 @@
                         </div>
                     </div>
 
+                    <!-- Query Statistics -->
+                    <div id="queryStats" class="query-stats"></div>
+
                     <!-- Pagination Controls -->
                     <div class="pagination-controls">
-                        <button id="prevBtn" class="btn btn-outline" disabled>
+                        <button type="button" id="prevBtn" class="btn btn-outline" disabled>
                             ← Trước
                         </button>
-                        <button id="nextBtn" class="btn btn-outline" disabled>
+                        <button type="button" id="nextBtn" class="btn btn-outline" disabled>
                             Tiếp →
                         </button>
                     </div>
